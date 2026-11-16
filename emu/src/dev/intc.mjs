@@ -15,6 +15,10 @@ export const IRQ_OSD_ENGINE = B.irq_osd_engine, IRQ_IPI = B.irq_ipi;
 // +0x514 (the CPU entries write 0x40 there, the kernel's INTC inits 0, D) and whose handler 0x50003faf writes 1 to its
 // +0x814
 const IRQ_KICK = B.irq_ipi + 1;
+// kick_cross (the E-PM2's board, src/fw/models.mjs E101): a bank's kick raises the kick's IRQ of the OTHER core, not its
+// own: CPU 0 writes 1 to bank 0's +0x310 (0x99200310) and CPU 1's IRQ 124 handler 0x7e44efea clears it with 1 at bank
+// 0's +0x314, and CPU 1's kick of CPU 0 the same way round (D, X: src/boot/e101.mjs, both kernels start)
+const KICK_CROSS = !!B.kick_cross;
 export const IRQ_VSC = (c) => B.irq_vsc0 + 2 * c, IRQ_TIMER = timerIrq;
 const BANK_BASE = B.banks;
 const PRESENTED = B.presented, IPI_SET = B.ipi_set, IPI_CLEAR = B.ipi_clear, KICK = B.kick, CTL = B.ctl, OFF = B.off ?? null;   // off: the E143 board's only
@@ -45,6 +49,10 @@ export class Intc {
     this.line = new Uint8Array(IRQS); this.test = new Uint8Array(IRQS); this.driven = new Uint8Array(IRQS);
     this.presentedMask = 0;
     this.setIrq = null;                      // the machine's set_irq callback
+    // onMask(core, mask): told each new presented mask, core 0's (recompute) and the second core's (recompute2); null
+    // by default. A harness that mirrors the request into a CPU's own registers listens here (src/boot/e101.mjs: the
+    // GnICR request flags the E-PM2's kernel polls)
+    this.onMask = null;
     // A second core (src/core/cores.mjs, createMachine's cores option; null, the default: bank 0 alone presents): its
     // bank b2 presents to it as bank 0 to CPU 0, with IRQ 324's line its own pending bits and IRQ 325's line its own
     // kick (A-KICK: +0x810 = 1 raises it, +0x814 = 1 clears it); cur names the core the CPU model runs (0 or b2),
@@ -94,7 +102,7 @@ export class Intc {
     const b = this.b2, want = 1 << level, lv = this.level[b];
     for (let irq = 0; irq < IRQS; irq++) {
       if (lv[irq] !== want) continue;
-      if (irq === IRQ_IPI ? this.pending[b] !== 0 : irq === IRQ_KICK ? this.kick[b] !== 0 : (this.line[irq] !== 0 || this.test[irq] !== 0)) return irq;
+      if (irq === IRQ_IPI ? this.pending[b] !== 0 : irq === IRQ_KICK ? this.kick[KICK_CROSS ? 0 : b] !== 0 : (this.line[irq] !== 0 || this.test[irq] !== 0)) return irq;
     }
     return -1;
   }
@@ -102,11 +110,16 @@ export class Intc {
     let mask = 0;
     for (let l = 0; l < LEVELS; l++) if (this.presented2(l) >= 0) mask |= 1 << l;
     this.mask2 = mask;
+    if (this.onMask) this.onMask(1, mask);
     if (this.setIrq2) this.setIrq2(mask !== 0);
   }
   enableSecond(b, setIrq2) { this.b2 = b; this.setIrq2 = setIrq2; this.driven[IRQ_KICK] = 1; this.recompute2(); }
-  // A-KICK: bank 0's kick drives IRQ 325's line as bank 0's pending bits drive IRQ 324's; the second core's, its bank
-  kickUpdate(b) { if (b === 0) this.setLine(IRQ_KICK, this.kick[0] !== 0); else if (b === this.b2) this.recompute2(); }
+  // A-KICK: bank 0's kick drives IRQ 325's line as bank 0's pending bits drive IRQ 324's; the second core's, its bank.
+  // With kick_cross the other way round: bank 0's kick is the second core's request, the second bank's drives the line
+  kickUpdate(b) {
+    if (KICK_CROSS) { if (b === 0) this.recompute2(); else if (b === this.b2) this.setLine(IRQ_KICK, this.kick[b] !== 0); return; }
+    if (b === 0) this.setLine(IRQ_KICK, this.kick[0] !== 0); else if (b === this.b2) this.recompute2();
+  }
   recompute() {
     let mask = 0;
     for (let l = 0; l < LEVELS; l++) {
@@ -118,6 +131,7 @@ export class Intc {
       this.dbg[D.LINES + irq] = (this.line[irq] ? 1 : 0) | (this.test[irq] ? 2 : 0) | (this.driven[irq] ? 0x80 : 0);
     }
     this.presentedMask = mask;
+    if (this.onMask) this.onMask(0, mask);
     this.dset(D.LEVEL_MASK, mask);
     this.dset(D.REQUEST, mask !== 0 ? 1 : 0);
     // every set_irq(true) is a CPU kick: the machine's callback sets S.kick.
