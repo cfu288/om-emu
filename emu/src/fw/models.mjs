@@ -1379,6 +1379,51 @@ export const MODELS = {
       '0x5002e68f': { to: '0x5004c56a', why: 'LEVEL_HANDLERS[5]: the kernel\'s level-handler table kcb[88] after its init holds 0x5004c56a (X); the leg map put levels 2 and 3 on level 1\'s handler and levels 4 and 5 one handler late (irq)' },
     },
   },
+  // E-PM2 (2012), tier D of the survey (docs/model-survey.md): no port of the lab (the HLE lab does not load on it:
+  // its addresses, the ones src/lab names through A(), are E143's), but its firmware boots from the reset vector in the
+  // boot lab (src/boot/e101.mjs, bin/boot.mjs, docs/e101-boot-spec.md), which reads these facts through the machine
+  // (src/fw/board.mjs BOARD). Each is D (the address shown) unless tagged
+  E101: {
+    name: 'E-PM2', bin: 'OLY_E_101_1600_0000_0000.BIN', version: '1.6', res_block: null,
+    // the main block (OE, flags 0x0100, load 0x402c0000), descrambled: 14,155,712 bytes
+    rom_len: 0xD7FFC0, rom_sha256: '1b7c4bb187e5e0b6e76ef362a4095a5b3fcf92917367999d32d6b6404b71468d',
+    // the reset head's jump at 0x500000d2: mov 0x7e421115,a0; jmp (a0), the run-time copy at 0x7e421020
+    image_base: 0x7E421020,
+    // the 3.0-inch 460k-dot TFT and the optional VF-2 / VF-3 EVF, as the vendor gives them; only the VSC model reads
+    // them, which this body parks (board.vsc). The boot lab's screen is the display controller's 720 x 480
+    panels: { tft: [640, 480], evf: [800, 600] },
+    card_fs: { native: false, why: 'no lab session on E101: its card runs in the boot lab (src/boot/e101card.mjs)' },
+    board: {
+      family: 'E118',
+      // hardware semaphores at 0x8fe00000: the lock helper 0x7e432851 (bset d0,(a0)) and its users load +0 and +4 only
+      isc: { base: 0x8FE00000, stride: 4, groups: 2 },
+      // two banks, picked by the CPU number (0x8050) in irq_register 0x7e44b57f; irq < 125; the doorbell IRQ 123;
+      // 0x99b00000, the E118 family's third bank, is the AE statistics unit here (its driver 0x7e629854, AE_SEM). The kick +0x310 as the family's, its acknowledge +0x314 (CPU 1's IRQ 124 handler 0x7e44efea writes 1 there, D)
+      // where the family has K-INTC's control word, so no ctl; kick_cross: CPU 0's kick raises CPU 1's IRQ 124 and CPU 1's
+      // CPU 0's (src/dev/intc.mjs; X: src/boot/e101.mjs, both kernels start). irq_osd_engine / irq_vsc0: the parked
+      // om-emu engine and VSC models on lines no E-PM2 device uses (its OSD engine's IRQ 111 and its display
+      // controller's IRQ 14 are src/boot/e101dev.mjs's)
+      intc: { banks: [0x99200000, 0x99300000], irqs: 125, irq_ipi: 123, ctl: null, kick_cross: true, irq_osd_engine: 54, irq_vsc0: 50 },
+      // 0x98900000: the E118 family's layout, channel 0's prescaler 161, the tick channel 1 on IRQ 69 (irq_base 68)
+      timer: { prescaler: 161, irq_base: 68 },
+      // parked: 0x9c000000 is the IMG library's per-CPU window on the E-PM2 (cmp (0x8050): 0x9c000000 / 0x9e000000),
+      // not a VSC, and 0x9c100000 holds no OSD engine (docs/model-survey.md item 2 of "What the survey shows"). Both
+      // models sit on pages no E-PM2 code loads (no fc-prefixed imm32 in 0x9f600000..0x9f61ffff, X: a census), so
+      // those E-PM2 addresses fall to the lab stub, or to the boot lab's blocks (src/boot/e101.mjs BLOCKS)
+      vsc: { base: 0x9F600000, levels: false },
+      engine: { base: 0x9F610000 },
+      // the CPU number byte the E-PM2 reads (843 readers of (0x8050)); lab low RAM, 0 = CPU 0
+      core_byte: 0x8050,
+      // interrupt vectors: the vector init at 0x7e42109c loads 0x7e430020..0x7e430070
+      vector_page: 0x7E430000,
+      // the image ends at 0x7f1a0fe0 (0x7e421020 + 0xd7ffc0): 512 MiB of DRAM from 0x60000000 covers it
+      dram_size: 512 << 20,
+      library: null, preload: [],
+      // no lab session, so no lab scratch region
+      scratch: null,
+      reset_head: null,
+    },
+  },
 };
 export const codeOf = (m) => 'E' + m.bin.slice(6, 9);
 export const romPath = (m) => `unpacked/${codeOf(m)}/${m.bin}.blk00000000.OE.0100.bin`;
