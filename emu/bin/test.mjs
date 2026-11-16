@@ -20,7 +20,8 @@
 // synthesized shutter sound at a
 // release, and the AF beep end to end (test_audio.mjs), the audio hardware and AUD_EXEC's play path on E143
 // (test_audiohw.mjs), the SCPU's clock, ports, link pins and sub-CPU model
-// (test_scpu.mjs), the publication audit (test_pubaudit.mjs), patch overlays (test_patch.mjs: the rules, --patch and
+// (test_scpu.mjs), the boot lab's units and the E-PM2 (E101) from its reset vector with its update path (test_boot.mjs,
+// in a child; E101's .BIN from BLOBS.sha256 or $OM_FW_DIR, else counted as a failure), the publication audit (test_pubaudit.mjs), patch overlays (test_patch.mjs: the rules, --patch and
 // --main on E143 through debug.mjs, play.mjs and nav.mjs, the hook rule; an om3-patch-2 file and --main on E147), the
 // boot's section loader (test_sections.mjs: the rules and the unloaded ranges on a synthetic block, a patched routine
 // past section 6's end through debug.mjs on E143 and E147, and S-SECLOADED with its negative control on E143), the
@@ -995,6 +996,15 @@ bad += pj.bad.length + rbx.bad.length + pg.bad.length + cdt.bad.length + wk.bad.
   console.log(`the SCPU's own firmware behind the link: units ${mu.checks - mu.bad.length}/${mu.checks}; in play against S-SCPUDEV (E143) ${ms.checks - ms.bad.length}/${ms.checks}${ms.skipped.length ? `, ${ms.skipped.length} SKIPPED` : ''}; E146 ${r.status === 0 ? 'ok' : 'FAILED'}`);
   [...mu.bad, ...ms.bad, ...ms.skipped.map((x) => `SKIPPED ${x}`), ...e146].forEach((x) => console.log('  ', x));
   bad += mu.bad.length + ms.bad.length + ms.skipped.length + (r.status === 0 ? 0 : 1);
+}
+// the boot lab (src/boot/, test_boot.mjs): its units and the E-PM2's start and update path from the reset vector, in a
+// child on E101's board; without E101's .BIN the session counts as a failure
+{
+  const { bootUnits, bootSession } = await import('../test/test_boot.mjs');
+  const bu = bootUnits(), bs = bootSession();
+  console.log(`the boot lab: units ${bu.checks - bu.bad.length}/${bu.checks}; the E-PM2 from its reset vector ${bs.checks - bs.bad.length}/${bs.checks}${bs.skipped.length ? `, ${bs.skipped.length} SKIPPED` : ''}`);
+  [...bu.bad, ...bs.bad, ...bs.skipped.map((x) => `SKIPPED ${x}`)].forEach((x) => console.log('  ', x));
+  bad += bu.bad.length + bs.bad.length + bs.skipped.length;
 }
 // the firmware map (bin/fwmap.mjs) and the machine's coverage option
 {
