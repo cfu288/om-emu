@@ -26,9 +26,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { parseArgs } from '../checks/lib/args.mjs';
+import { parseArgs, UsageError } from '../checks/lib/args.mjs';
 import { takeModel, importLab } from '../host/modelarg.mjs';
-// (checks/lib/env.mjs, whose exitFor reports a usage error, imports the lab's model: it is loaded after --model is read)
+// (not checks/lib/env.mjs: it imports the HLE lab, which does not load on a body without a port; a usage error is
+// reported here as its exitFor does: 'PROG: message' and the usage line, exit 2)
 
 const PROG = 'boot.mjs', BOOTS = { E101: '../src/boot/e101.mjs' };
 process.env.OM_EMU_MODEL ??= 'E101';
@@ -55,7 +56,10 @@ const SPECS = {
 const cmd = argv[0];
 if (!SPECS[cmd]) fail(2, `usage: ${PROG} report|update|play|crawl ... (${cmd === undefined ? 'no command' : `unknown command ${cmd}`}; the header says more)`);
 let opts;
-try { opts = parseArgs(`${PROG} ${cmd}`, argv.slice(1), [...COMMON, ...SPECS[cmd]]); } catch (e) { const { exitFor } = await import('../checks/lib/env.mjs'); process.exit(exitFor(PROG, e)); }
+try { opts = parseArgs(`${PROG} ${cmd}`, argv.slice(1), [...COMMON, ...SPECS[cmd]]); } catch (e) {
+  if (!(e instanceof UsageError)) throw e;
+  process.stderr.write(`${PROG}: ${e.message}\n${e.usage ? `${e.usage}\n` : ''}`); process.exit(2);
+}
 
 const host = await importLab(PROG, new URL('../host/boot.mjs', import.meta.url).href);
 const { createE101, tasks } = await importLab(PROG, new URL(BOOTS[MODEL], import.meta.url).href);
@@ -95,7 +99,7 @@ if (cmd === 'report') {
   const t0 = Date.now();
   const r = e.run({ maxLabMs: opts.ms, maxMs: 300000 });
   const con = CON(e.console);
-  console.log('image:', path.basename(binFile), fw.stock ? '(stock)' : `(main block ${fw.sha256.slice(0, 16)}, not stock)`);
+  process.stderr.write(`image: ${path.basename(binFile)} ${fw.stock ? '(stock)' : `(main block ${fw.sha256.slice(0, 16)}, not stock)`}\n`);   // stderr: the report's lines are the run's alone
   console.log('stop:', JSON.stringify(r), '| lab ms', labMs().toFixed(1), '| wall ms', Date.now() - t0, '| insns cpu0', S.insns, 'cpu1', e.m.cores.state().insns);
   console.log('console (' + con.length + ' lines, prm tag messages left out):\n  ' + con.join('\n  '));
   console.log('boot marks:', e.marks.length, 'last', e.marks.slice(-3).map((m) => m[0]).join(' '));
