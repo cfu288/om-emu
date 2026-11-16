@@ -21,8 +21,8 @@
 //   coresUnits   (no firmware) the machine's second core on a blank image: each core reads its own core number at
 //                0x8050, core 2 stores into its local RAM at 0x50000000 while core 0's flash view refuses a store, the
 //                interleave gives core 2 a turn of the quantum per quantum of core 0, a doorbell on bank 2 and then
-//                its level raise core 2's request (the level write recomputes it) and not core 0's, and the machine
-//                refuses a snapshot
+//                its level raise core 2's request (the level write recomputes it) and not core 0's, the machine
+//                refuses a snapshot, and the cores option vectorPage gives core 2 a vector page of its own
 //   node emu/test/test_cpu2.mjs
 import { fileURLToPath } from 'node:url';
 
@@ -62,7 +62,18 @@ export function coresUnits() {
     let refused = null;
     try { m.snapshot(); } catch (e) { refused = e.message; }
     ok(refused !== null && /second core/.test(refused), `snapshot refused: ${refused}`);
-    return { checks, bad };
+    // the cores option vectorPage: the second core's own vector page, kept across the switches; core 0 keeps the board's
+    return import('../src/core/cpu.mjs').then(({ S }) => {
+      const page0 = S.vectorPage, mv = createMachine({ rom: new Uint8Array(0x1000), insnLimit: 0, cores: { second: 2, quantum: 1000, vectorPage: 0x7E440000 } });
+      const board = S.vectorPage;
+      mv.dbgWrite(P0, Uint8Array.from([0x44, 0xFE])); mv.dbgWrite(P2, Uint8Array.from([0x48, 0xFE]));   // inc d0 / d2; bra back
+      const rv = mv.getRegs(); rv[9] = P0; rv[10] = 0; rv[15] = 0; mv.setRegs(rv);
+      mv.cores.start(P2, 0); mv.cores.interleave = true;
+      mv.cont({ budget: 5000 }); mv.halt();
+      ok(board === page0 && S.vectorPage === board && mv.cores.ctx[2].S.vectorPage === 0x7E440000 && mv.cores.state().turns >= 4,
+        `vector pages: core 0 0x${(S.vectorPage >>> 0).toString(16)} (the board's 0x${(board >>> 0).toString(16)}), core 2 0x${(mv.cores.ctx[2].S.vectorPage >>> 0).toString(16)}, turns ${mv.cores.state().turns}`);
+      return { checks, bad };
+    });
   });
 }
 

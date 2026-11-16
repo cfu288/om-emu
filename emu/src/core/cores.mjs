@@ -26,14 +26,14 @@ import { R, S, PC, PSW, admits, execInterrupt, trapLines } from './cpu.mjs';
 import { run, coreInterp, setCoreInterp, setLocalPage, stepAny, RUN_VISIT, RUN_LIMIT, RUN_FAULT, RUN_BP } from './interp.mjs';
 import { Fault, K_RAM, U8, addRegion, allocWindow, markDirty, pageState, setPageState, IO, CST, dbgRead, dbgWrite } from './mem.mjs';
 
-const CORE_S = ['insns', 'irqReq', 'irqWait', 'kick', 'exitReq', 'limit', 'fault'];
+const CORE_S = ['insns', 'irqReq', 'irqWait', 'kick', 'exitReq', 'limit', 'fault', 'vectorPage'];
 export const CORE_PAGE = 0x0000, LOCAL_PAGE = 0x5000, CORE_ID = 0x8050;
 const h8 = (v) => '0x' + (v >>> 0).toString(16).padStart(8, '0');
 
 class Ctx {
   constructor(n) {
     this.n = n; this.R = new Int32Array(R.length);
-    this.S = { insns: 0, irqReq: false, irqWait: false, kick: false, exitReq: false, limit: 0, fault: null };
+    this.S = { insns: 0, irqReq: false, irqWait: false, kick: false, exitReq: false, limit: 0, fault: null, vectorPage: S.vectorPage };
     this.interp = null; this.pages = new Map(); this.io = { n: -1, pc: 0 };
     this.cst = { n: new Float64Array(32), o: new Int32Array(32), k: 0 };
     this.started = false; this.halted = false; this.parked = null; this.resumable = false;
@@ -43,7 +43,10 @@ class Ctx {
 }
 
 export class Cores {
-  constructor(m, intc, { second = 2, quantum = 2000 } = {}) {
+  // vectorPage: the second core's interrupt vector page (cpu.mjs S.vectorPage), null for the board's. Each core keeps its
+  // own (CORE_S): E143's CPU 2 takes its interrupts through the board's page; the E-PM2's CPU 1 takes them in page
+  // 0x7e44 (its kick handler 0x7e44efea, IRQ 124, runs there, X: src/boot/e101.mjs), the boot's run-time copy (I)
+  constructor(m, intc, { second = 2, quantum = 2000, vectorPage = null } = {}) {
     if (!Number.isInteger(quantum) || quantum < 1) throw new RangeError(`cores: quantum ${quantum}: a positive instruction count`);
     this.m = m; this.intc = intc; this.second = second; this.quantum = quantum;
     this.cur = 0; this.q0 = 0; this.interleave = false;
@@ -52,6 +55,7 @@ export class Cores {
     this.stats = { turns: 0, insns: 0, switches: 0, halts: 0, wakes: 0, skipped: 0 };
     this.problems = [];
     const c0 = this.ctx[0], c2 = this.ctx[second];
+    if (vectorPage !== null) c2.S.vectorPage = vectorPage >>> 0;
     for (const p of [CORE_PAGE, LOCAL_PAGE]) c0.pages.set(p, pageState(p));
     // the second core's own pages: RAM, zero but for its core number (the hardware's register, which no code writes,
     // cores spec 2; A-COREID)

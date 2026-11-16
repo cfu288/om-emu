@@ -203,7 +203,7 @@ report('PER_SIO\'s served IIC transfers and the TG-5\'s charger (S-SIOIIC, S-CHA
 report('debug API: argument checks, halt, trace filters, live route', await liveUnits());
 report('debug API: the call op\'s argument checks, the exec trace\'s registers (src/debug/call.mjs)', callUnits());
 report('the session tool\'s call token: entry=, stop=, frame= and call:@FILE (host/session.mjs)', callTokenUnits());
-report('the machine\'s second core: core numbers, local RAM, interleave, bank 2\'s request (src/core/cores.mjs)', await coresUnits());
+report('the machine\'s second core: core numbers, local RAM, interleave, bank 2\'s request, its vector page (src/core/cores.mjs)', await coresUnits());
 report('debug API: trace rules and edge cases (halfword device accesses, stub code, bus window, fetch faults, interrupt entry)', traceRuleUnits());
 report('publication audit (throwaway repository, made-up firmware)', await pubauditTests());
 report('Cortex-M4 core: decoder, executor, exceptions (hand-written)', m4Units());
