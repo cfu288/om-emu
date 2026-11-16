@@ -1379,10 +1379,11 @@ export const MODELS = {
       '0x5002e68f': { to: '0x5004c56a', why: 'LEVEL_HANDLERS[5]: the kernel\'s level-handler table kcb[88] after its init holds 0x5004c56a (X); the leg map put levels 2 and 3 on level 1\'s handler and levels 4 and 5 one handler late (irq)' },
     },
   },
-  // E-PM2 (2012), tier D of the survey (docs/model-survey.md): no port of the lab (the HLE lab does not load on it:
-  // its addresses, the ones src/lab names through A(), are E143's), but its firmware boots from the reset vector in the
-  // boot lab (src/boot/e101.mjs, bin/boot.mjs, docs/e101-boot-spec.md), which reads these facts through the machine
-  // (src/fw/board.mjs BOARD). Each is D (the address shown) unless tagged
+  // E-PM2 (2012), tier D of the survey (docs/model-survey.md). Ported directly from E143 (bin/port.mjs, 2026-11-16: 907
+  // addresses translated, 238 unmapped), so the lab's modules load and bin/debug.mjs calls its functions; no lab
+  // session runs on it. Its firmware boots from the reset vector in the boot lab (src/boot/e101.mjs, bin/boot.mjs,
+  // docs/e101-boot-spec.md), which reads the board below through the machine. Each fact is D (the address shown)
+  // unless tagged
   E101: {
     name: 'E-PM2', bin: 'OLY_E_101_1600_0000_0000.BIN', version: '1.6', res_block: 'blk00d80000.OE.0101.bin',
     // the main block (OE, flags 0x0100, load 0x402c0000), descrambled: 14,155,712 bytes

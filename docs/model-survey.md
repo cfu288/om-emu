@@ -68,7 +68,7 @@ through a reference place more; "Per-body status" has their figures).
 | E111 | STYLUS 1 | 2004 | 15.0 | 0x7e0e1020 (8.1%) | plain | 0.44M | 187 | not tried (base) |
 | E108 | E-P5 | 1800 | 15.0 | 0x7e101020 (8.0%) | plain | 0.42M | 188 | not tried (base) |
 | E100 | E-PL5 | 1600 | 13.5 | 0x7e421020 (8.3%) | plain | 0.30M | 215 | not tried (base) |
-| E101 | E-PM2 | 1600 | 13.5 | 0x7e421020 (8.3%) | plain | 0.30M | 216 | no lab session; boots from its reset vector in the boot lab to its menus, playback, the card and the update path (`docs/e101-boot-spec.md`, 2026-11-16) |
+| E101 | E-PM2 | 1600 | 13.5 | 0x7e421020 (8.3%) | plain | 0.30M | 216 | ported from E143 (907 translated, 238 unmapped; `bin/debug.mjs` calls its functions); no lab session; boots from its reset vector in the boot lab to its menus, playback, the card and the update path (`docs/e101-boot-spec.md`, 2026-11-16) |
 | E112 | E-PL6 | 1400 | 13.5 | 0x7e421020 (8.5%) | plain | 0.30M | 215 | not tried (base) |
 | E106 | TG-2 | 1100 | 14.0 | 0x6e465020 (9.6%) | plain | 0.25M | 230 | not tried (base) |
 | E110 | TG-2 Limited | 1100 | 14.0 | 0x6e465020 (9.6%) | plain | 0.25M | 230 | not tried (base) |

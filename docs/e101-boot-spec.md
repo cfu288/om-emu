@@ -19,6 +19,18 @@ second core, the interrupt controller, the timer and the lab clock) with few dev
 run from the reset vector, as `docs/ROADMAP.md` "Longer term: full-boot LLE" plans for E143: every access to a device
 nothing declares faults (fault 2), and a device or a stand-in is added only where the code shows what it needs.
 
+### Function calls
+
+E101 also has a port of the lab's addresses (`src/fw/ports.mjs`, `bin/port.mjs E101` directly against E143: 300,718
+instructions paired, 907 addresses translated, 238 unmapped, X). The lab's modules then load on E101, so `bin/debug.mjs`
+runs its functions from an entry with stops and stubs (`OM_EMU_MODEL=E101 node emu/bin/debug.mjs --serve`); no lab
+session runs. Five rules found nothing of their form on E101 and leave their fact out; four facts are given by hand
+(`src/fw/models.mjs` E101: the resource loader's limits, the GUI canvas, the EVF code). Open: with E101's blocks
+unpacked, 8 checks of `emu/test/test_facts.mjs` fail: its independent scans and the rules disagree on the touch
+driver, the lens mount and the card's detect table (two drives on a one-slot body, I), and the error-log entry
+(`0x50005d2b`, the boot lab's error-log hook, X), the card's count query and the VSC's levels have no pin yet. Each
+needs its evidence; none is pinned from a rule's own answer.
+
 ## 2. The boot lab (`emu/src/boot/bootlab.mjs`, `flash.mjs`)
 
 - **Machine.** `createMachine` on E101's board (`src/fw/models.mjs` E101: the E118 family's, with its own controller
