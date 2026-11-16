@@ -1098,7 +1098,7 @@ export function factsTests() {
     // the block's load address, from its index area (src/lab/resources.mjs)
     const resLoad = loadAddress(head(resFile, INDEX_READ));
     let got;
-    try { got = readFacts({ img, family: FAMILIES[m.board.family], resLoad }); } catch (e) { got = e.message; }
+    try { got = readFacts({ img, family: { ...FAMILIES[m.board.family], ...(Object.hasOwn(m.board, "reset_head") && { reset_head: m.board.reset_head }) }, resLoad }); } catch (e) { got = e.message; }
     // the placed rules at the port's places (E143: its own; a model not ported yet: none), on the run-time image with
     // the preload rows read, as bin/port.mjs runs them (dialStore reads E125's word table there)
     const at = (v) => (code === 'E143' ? v : !PORTS[code] ? null : PORTS[code][v] === undefined ? v : PORTS[code][v]);

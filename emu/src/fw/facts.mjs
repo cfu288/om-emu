@@ -317,6 +317,9 @@ export function resLoader(img, resLoad) {
       images.push({ first: u32(img, o + 7), last: u32(img, o + 17), at: o });
     }
   }
+  // none at all: a loader of another form, which this rule does not read (E101's 0x50253efe dispatches per record kind
+  // and loads no font or string slot, D); its limits are the model's to give (src/fw/models.mjs res)
+  if (slots.length === 0) return undefined;
   if (slots.length !== 2 || images.length !== 1 || !(slots[0].at < images[0].at && images[0].at < slots[1].at) || slots[0].call !== slots[1].call) {
     throw new Error(`resLoader: after the index read at ${h8(0x50000000 + at)}: ${slots.length} slot loads (want 2, one call) and ${images.length} image-record selects (want 1, between them)`);
   }
@@ -2310,6 +2313,9 @@ export function shootingService(img) {
     const at = findString(img, name, { nul: true });
     if (!at.length) continue;
     const sites = loadsOf(img, base + at[0]).filter((o) => img[o + 1] === 0xcc);                    // mov <name>,d0
+    // a name loaded by more than one function is no single service start: E101 loads "startShootingService" at
+    // 0x50568188 and 0x5056872c, in two functions of that name (D); the next name decides
+    if (at.length === 1 && sites.length > 1) continue;
     if (at.length > 1 || sites.length !== 1) throw new Error(`shootingService: "${name}" ${at.length} times, loaded ${sites.length} times, want one each`);
     const o = SHOOTING_ENTRY.has(k) ? entryOf(img, sites[0], SHOOTING_SPAN) : sites[0];
     if (o === undefined) throw new Error(`shootingService: no function entry within 0x${SHOOTING_SPAN.toString(16)} bytes before the load of "${name}" at ${h8(0x50000000 + sites[0])}`);
@@ -3290,7 +3296,7 @@ const DCF_COUNT_GET = [0x86, 0x16, 0xfa, 0xca, 0xff, 0x00, 0xc9, null, 0x1c, 0xf
   0xf8, 0x00, 0x28];
 export function dcfCounts(img) {
   const at = oneAt(img, DCF_COUNT_GET, 'dcfCounts', 'count getters');
-  if (at === null) throw new Error('dcfCounts: no DCF count getter');
+  if (at === null) return undefined;           // no getter of this form (E101, X: bin/port.mjs): the fact is absent
   return u32(img, at + 14);
 }
 // The picture file API's erase calls (fact 'erase', src/lab/camapp.mjs H-OBJDEL; docs/model-survey.md findings 137
@@ -3368,6 +3374,7 @@ export function mountState(img) {
     for (; img[p] === 0xa0 && img[p + 2] === 0xc8; p += 4) kinds.push({ kind: img[p + 1], to: p + 2 + (img[p + 3] << 24 >> 24) });
     if (bytesAt(img, p, MDA_SET_WORD)) found.push({ o, p, kinds });
   }
+  if (found.length === 0) return undefined;     // no setter of this form (E101, X): the fact is absent, its place unported
   if (found.length !== 1) throw new Error(`mountState: ${found.length} mount state setters (${found.map((f) => h8(0x50000000 + f.o)).join(', ')}), want one`);
   const [{ o, p, kinds }] = found;
   if (kinds[0].kind !== 4 || kinds[0].to !== p + 2) {
@@ -5139,6 +5146,9 @@ export function guiCanvas(img) {
     const b = o - (GUI_BANK.length - 2), k = GUI_BANK_IDS.indexOf(img[o + 2]);
     if (img[o + 1] === 0x00 && k >= 0 && b >= 0 && bytesAt(img, b, GUI_BANK)) banks[k].push([u32(img, b + 21), u32(img, b + 27), img[b + 1]]);
   }
+  // no bank set up in this form at all: E101's GUI sets up its kind-3 canvas another way (0x508ac4ef, base 0xbe0eda00,
+  // 896 x 600, X: bin/port.mjs), so its canvas is the model's to give (src/fw/models.mjs gui)
+  if (banks.every((x) => x.length === 0)) return undefined;
   const bad = banks.findIndex((x) => x.length !== 1);
   if (bad >= 0) throw new Error(`guiCanvas: ${banks[bad].length} setups of bank 0x${GUI_BANK_IDS[bad].toString(16)}, want 1`);
   const sizes = banks.map(([[, size]]) => size);
@@ -5830,8 +5840,8 @@ export function readFacts({ img, family, resLoad }) {
   } else if (family.reset_head !== null) throw new Error(`readFacts: board reset_head ${JSON.stringify(family.reset_head)} has no rule here`);
   facts.board = { ...facts.board, vector_page: vectorPage(img) };
   if (family.vsc.kind === 3) facts.board.vsc = { levels: vscLevels(img, family.vsc.base) };
-  const { font, string } = resLoader(img, resLoad);
-  facts.res = { font_limit: font.limit, string_limit: string.limit };
+  const loader = resLoader(img, resLoad);
+  if (loader !== undefined) facts.res = { font_limit: loader.font.limit, string_limit: loader.string.limit };
   const take = guiTake(img);
   const caller = guiCaller(img, take), task = guiTask(img);
   facts.menu = { list_menu: listMenu(img), ...menuMemory(img), ...(take !== undefined && { take, caller }), ...(task !== undefined && { task }) };
@@ -5880,14 +5890,16 @@ export function readFacts({ img, family, resLoad }) {
   const media = mediaHls(img, storage);
   if (media !== undefined) facts.media = media;
   facts.recorder = recorder(img);
-  facts.dcf = { counts: dcfCounts(img) };
+  const dcf = dcfCounts(img);
+  if (dcf !== undefined) facts.dcf = { counts: dcf };
   facts.erase = pictureErase(img);
   facts.media_status = mediaStatus(img);
-  facts.mount_state = mountState(img);
+  const mount = mountState(img);
+  if (mount !== undefined) facts.mount_state = mount;
   const usbOff = usbPowerOff(img);
   if (usbOff !== undefined) facts.power_off = { usb_disconnect: usbOff };
-  facts.gui = guiCanvas(img);
-  facts.board.dram_size = dramSize(facts.gui);
+  const gui = guiCanvas(img);
+  if (gui !== undefined) { facts.gui = gui; facts.board.dram_size = dramSize(gui); }
   const recview = recViewStandby(img);
   facts.recview = recview ?? null;
   facts.touch_int = touchIntWait(img) ?? null;
@@ -5926,7 +5938,7 @@ export function rulePlaces(facts) {
     ...(facts.kernel.handlers !== undefined ? [[HANDLER_TABLE_E143, { to: facts.kernel.handlers, how: 'attach-stores' }]] : []),
     [SHOTS_QUERY_E143, { to: facts.card.shots_query, how: 'shots-method' }],
     [MEDIA_STATUS_E143, { to: facts.media_status, how: 'status-setter' }],
-    [MOUNT_STATE_E143, { to: facts.mount_state, how: 'mount-setter' }],
+    ...(facts.mount_state !== undefined ? [[MOUNT_STATE_E143, { to: facts.mount_state, how: 'mount-setter' }]] : []),
     ...(facts.touch_api ? [[TP_OPEN_E143, { to: facts.touch_api.open, how: 'open-rule' }]] : []),
     ...(facts.display.task_init !== undefined ? [[DISPLAY_TASK_INIT_E143, { to: facts.display.task_init, how: 'queue-init' }]] : []),
     ...(facts.display.face_colour !== undefined ? [[FACE_COLOUR_SET_E143, { to: facts.display.face_colour, how: 'cpdata-trace' }]] : []),

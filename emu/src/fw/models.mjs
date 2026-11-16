@@ -1384,15 +1384,24 @@ export const MODELS = {
   // boot lab (src/boot/e101.mjs, bin/boot.mjs, docs/e101-boot-spec.md), which reads these facts through the machine
   // (src/fw/board.mjs BOARD). Each is D (the address shown) unless tagged
   E101: {
-    name: 'E-PM2', bin: 'OLY_E_101_1600_0000_0000.BIN', version: '1.6', res_block: null,
+    name: 'E-PM2', bin: 'OLY_E_101_1600_0000_0000.BIN', version: '1.6', res_block: 'blk00d80000.OE.0101.bin',
     // the main block (OE, flags 0x0100, load 0x402c0000), descrambled: 14,155,712 bytes
     rom_len: 0xD7FFC0, rom_sha256: '1b7c4bb187e5e0b6e76ef362a4095a5b3fcf92917367999d32d6b6404b71468d',
+    // the resource block (OE, flags 0x0101, load 0x43c40000; its prefix's digest by src/fw/resprefix.mjs, X)
+    res_len: 11811808, res_sha256: '6d9ceba7ecdb85e245211f3a21ef707087a85c59b30e9c9f45d11ace5f3e771a',
     // the reset head's jump at 0x500000d2: mov 0x7e421115,a0; jmp (a0), the run-time copy at 0x7e421020
     image_base: 0x7E421020,
     // the 3.0-inch 460k-dot TFT and the optional VF-2 / VF-3 EVF, as the vendor gives them; only the VSC model reads
     // them, which this body parks (board.vsc). The boot lab's screen is the display controller's 720 x 480
     panels: { tft: [640, 480], evf: [800, 600] },
     card_fs: { native: false, why: 'no lab session on E101: its card runs in the boot lab (src/boot/e101card.mjs)' },
+    // the facts the lab's modules read when they are imported and no rule reads on E101 (src/fw/facts.mjs resLoader: a
+    // loader by record kind, no slot form; guiCanvas: the kind-3 canvas 0x508ac4ef, base 0xbe0eda00, 896 x 600, set up
+    // in no bank of E143's form; no EVF code: the E-PM2 has no built-in EVF, the accessory VF-2's code is ?). With them
+    // the lab's modules load, so that bin/debug.mjs calls E101's functions; no lab session runs on them
+    res: { font_limit: null, string_limit: null },
+    gui: { stride: 896, height: 600, banks: [], kind3: [0xBE0EDA00, 600] },
+    prop: { evf_code: null },
     board: {
       family: 'E118',
       // hardware semaphores at 0x8fe00000: the lock helper 0x7e432851 (bset d0,(a0)) and its users load +0 and +4 only
@@ -1410,12 +1419,10 @@ export const MODELS = {
       // not a VSC, and 0x9c100000 holds no OSD engine (docs/model-survey.md item 2 of "What the survey shows"). Both
       // models sit on pages no E-PM2 code loads (no fc-prefixed imm32 in 0x9f600000..0x9f61ffff, X: a census), so
       // those E-PM2 addresses fall to the lab stub, or to the boot lab's blocks (src/boot/e101.mjs BLOCKS)
-      vsc: { base: 0x9F600000, levels: false },
+      vsc: { base: 0x9F600000 },
       engine: { base: 0x9F610000 },
       // the CPU number byte the E-PM2 reads (843 readers of (0x8050)); lab low RAM, 0 = CPU 0
       core_byte: 0x8050,
-      // interrupt vectors: the vector init at 0x7e42109c loads 0x7e430020..0x7e430070
-      vector_page: 0x7E430000,
       // the image ends at 0x7f1a0fe0 (0x7e421020 + 0xd7ffc0): 512 MiB of DRAM from 0x60000000 covers it
       dram_size: 512 << 20,
       library: null, preload: [],

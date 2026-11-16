@@ -68,7 +68,7 @@ function body(c) {
   const img0 = expandImage(new Uint8Array(raw), { base: m.image_base, preload: [] });
   const facts = readFacts({ img: img0, family: board, resLoad: loadAddress(res) });
   const lb = resLoader(img0, loadAddress(res)), loaderPairs = new Map();
-  for (const [va, vb] of [[loaderA.font.slot, lb.font.slot], [loaderA.images.first, lb.images.first],
+  if (lb) for (const [va, vb] of [[loaderA.font.slot, lb.font.slot], [loaderA.images.first, lb.images.first],
     [loaderA.images.last, lb.images.last], [loaderA.string.slot, lb.string.slot]]) {
     loaderPairs.set(va, vb).set(alias(va), alias(vb));
   }
@@ -88,10 +88,13 @@ for (const f of fs.readdirSync(EMU)) { const p = path.join(EMU, f); if (fs.statS
 const LIT = /\b0x([0-9a-fA-F]{8})\b/g;
 const lits = new Set();
 // src/util holds no firmware addresses (its constants, sha256's among them, only look like some)
-// nor do the board and the CPU (their constants are the address map's own: the regions, the reset and vector bases)
+// nor do the board and the CPU (their constants are the address map's own: the regions, the reset and vector bases),
+// nor the boot lab, whose addresses are its body's own, not E143's (src/boot/e101.mjs: the E-PM2's), as bin/ustart.mjs
+// keeps its addresses out
 const ported = (rel) => rel.startsWith(`src${path.sep}`) && !rel.startsWith(`src${path.sep}util${path.sep}`) &&
   !rel.startsWith(`src${path.sep}core${path.sep}`) && rel !== path.join('src', 'machine.mjs') &&
-  !rel.startsWith(`src${path.sep}fw${path.sep}`);                // the models' own values, the unpacker, the map
+  !rel.startsWith(`src${path.sep}fw${path.sep}`) &&              // the models' own values, the unpacker, the map
+  !rel.startsWith(`src${path.sep}boot${path.sep}`);
 const portedText = files.filter((f) => f.endsWith('.mjs') && ported(path.relative(EMU, f))).map((f) => [path.relative(EMU, f), fs.readFileSync(f, 'utf8')]);
 for (const [, t] of portedText) for (const m of t.matchAll(LIT)) lits.add(parseInt(m[1], 16) >>> 0);
 // The literals translated like the others that do not seed the direct maps, each with what its seed did. A seed is
@@ -240,8 +243,13 @@ function port(code) {
   for (const [part, read] of Object.entries(facts)) {
     for (const [k, v] of Object.entries(read ?? {})) {
       if (!Object.hasOwn(M[part] ?? {}, k)) continue;
-      if (JSON.stringify(M[part][k]) !== JSON.stringify(v)) throw new Error(`${code}: src/fw/models.mjs ${part}.${k} ${JSON.stringify(M[part][k])}, src/fw/facts.mjs reads ${JSON.stringify(v)}`);
-      handGiven.push(`${part}.${k}`);
+      // a board sub-object (board.vsc) merges one level deep (src/fw/board.mjs mergeBoard): compare the fields both give
+      const plain = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+      const pairs = part === 'board' && plain(v) && plain(M[part][k]) ? Object.keys(v).filter((s) => Object.hasOwn(M[part][k], s)).map((s) => [`${k}.${s}`, M[part][k][s], v[s]]) : [[k, M[part][k], v]];
+      for (const [kk, hv, rv] of pairs) {
+        if (JSON.stringify(hv) !== JSON.stringify(rv)) throw new Error(`${code}: src/fw/models.mjs ${part}.${kk} ${JSON.stringify(hv)}, src/fw/facts.mjs reads ${JSON.stringify(rv)}`);
+        handGiven.push(`${part}.${kk}`);
+      }
     }
   }
   const table = new Map(), unmapped = new Map();
