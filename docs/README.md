@@ -28,6 +28,7 @@ or its harness chooses to behave, treat it as the model's assumption, not as har
 | [om1-scpu-spec.md](om1-scpu-spec.md) | the sub-CPU's own firmware: MCU, image, the MN link from its side, peripherals, RTOS, console, the LLE plan |
 | [om1-input-spec.md](om1-input-spec.md) | keys, dials, switches and touch in the lab: UI_IN, the touch driver, the stand-ins |
 | [om1-shutter-spec.md](om1-shutter-spec.md) | what S1, S2 and REC reach in the firmware, the image sensor stand-in (S-SCENE), and the camera application running natively |
+| [e101-boot-spec.md](e101-boot-spec.md) | the E-PM2 (E101) from its reset vector in the boot lab (`emu/src/boot/`): the machine it takes, its devices and stand-ins, its keys, what runs and what to trust |
 
 The emulator's own documents are in `emu/` ([README](../emu/README.md), [ARCHITECTURE](../emu/ARCHITECTURE.md),
 [FIDELITY-NOTES](../emu/FIDELITY-NOTES.md)); the firmware-patch investigations are in `analysis/`

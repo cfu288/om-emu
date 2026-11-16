@@ -132,6 +132,8 @@ One such divide is met in the lab (2026-10-29): E144 with an exFAT card divides 
 
 A second is met on E118 (2026-10-31): its movie record time divides by the movie recorder's frame rate without a test (`0x50535c40`), and the rate is 0 until a movie take or a movie's playback sets it up, on the camera too (`docs/model-survey.md` finding 59). There the quotient goes only to a field two of the query's seven callers read, none on the lab's paths, so S-MOVRATE stands in for that divide alone: not executed, its quotient taken as 0. The value is the lab's; the same capture would settle it.
 
+A third is met on E101 in the boot lab (2026-11-16): `divu d0,d1` at `0x7e6a3203` divides by a word that is 0 at the start, once in every boot (`docs/e101-boot-spec.md` section 5). S-DIV0 stands in for that divide alone when its divisor is 0 (d1 all ones, MDR kept, N and V set); the value is the lab's. The same body reads an undefined flag once: `rol d3` at `0x7e5018fc` reads the C the `udf04` before it leaves undefined, and the bit it reads is dropped by the `lsr 24` after it, so S-ROLC marks C defined there (D). Neither changes the core: the faults stay on everywhere else.
+
 **Confidence:** high
 
 ### 3.3 Page-crossing non-prefix instruction: wrong fault address and fault counted (fixed 2026-10-29)

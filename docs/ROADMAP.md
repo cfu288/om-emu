@@ -163,7 +163,7 @@ bodies; the bodies whose image runs at a `0x60xxxxxx` base pair 0.76M-2.08M inst
 | A | E134 E-M1X | `bin/modelcheck.mjs` passes on the TFT and the EVF (2026-10-23), the count probe included |
 | B | E137 E-M5 III, E142 E-P7, E140 E-M10 IV, E125 E-M1 II, E145 TG-7 | E137, E140 and E125: `bin/modelcheck.mjs`'s path passes on the TFT and the EVF, E142 and E145 (no EVF) on the TFT; the count probe passes on all five; E145 with MENU at its date and time setting (`0x1103`) after the start (2026-10-29) |
 | C | E133 E-PL9, E130 E-M10 III, E129 / E132 TG-5, E118 E-M5 II, E122 PEN-F, E120 E-M10 II | E130: `bin/modelcheck.mjs` passes on the TFT and the EVF (2026-10-23), the count probe too; E133, E129 and E132 on the TFT (2026-10-29), their cards native; the E118 family's board is ported (2026-10-30): E122, E118 and E120 pass `bin/modelcheck.mjs` on the TFT and the EVF with their cards native and their frames composed (2026-10-30, findings 38 to 56), the count probe since 2026-10-31 with the screen redrawn by INFO before each window (finding 61: the applications ask for the count only when the shooting screen is redrawn) |
-| D | E100, E101, E106-E113, E115, E117, E121, E126 | not tried |
+| D | E100, E101, E106-E113, E115, E117, E121, E126 | not tried in the lab; E101 boots from its reset vector in the boot lab (`docs/e101-boot-spec.md`, 2026-11-16) |
 | - | the new OM System PEN | not served as of the 2026-10-19 probe (E148-E199 answered nothing; E148 has since been served as the OM-5 II, finding 65): re-probe |
 
 The status of each body, its first stop and the evidence are in `docs/model-survey.md` ("Per-body status").
@@ -948,6 +948,14 @@ as real tasks and time mode by default (the M9 follow-ups, architecture phase 4)
 
 Verification: the firmware's own boot prints as progress markers; reaching GUI init without harness calls; display
 output identical to the harness-driven M2-M6 runs. Size: months.
+
+Done on a smaller body (2026-11-16): the E-PM2's (E101) firmware boots this way in the boot lab (`emu/src/boot/`,
+`emu/bin/boot.mjs`, `docs/e101-boot-spec.md`): its two cores from the reset vector through the loader copies, both
+kernels and every start task to the camera application, its menus, playback and the card, with 30 declared MMIO
+blocks (six with a model, 24 plain storage), stand-ins at its own addresses, and every other access refused
+(fault 2). What it shows for E143 (I): the harness the plan needs (a flash view, a block table, hooks that return as
+the call's `ret` would, lab time by instruction count, the second core's release) is small (`bootlab.mjs`); what E143
+adds is its devices, four cores and the sub-CPU.
 
 ## Firmware-patch track
 
